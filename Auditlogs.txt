@@ -1,0 +1,19 @@
+//list all login failures
+let databaseName = 'PRASYNAPSETEMPPOOL';
+//Get Query Text snippet
+AzureDiagnostics
+| where Resource  == databaseName
+| where Category == 'SQLSecurityAuditEvents' 
+| where succeeded_s == 'false'
+| where action_name_s == 'DATABASE AUTHENTICATION FAILED' // all login failures in the specified window
+| project LogicalServerName_s, Resource, event_time_t, succeeded_s, server_principal_name_s, statement_s
+
+
+//who changed login password
+let servername = 'prasynapsetempsvr';
+//Get Query Text snippet
+AzureDiagnostics
+| where LogicalServerName_s  == servername
+| where Category == 'SQLSecurityAuditEvents' 
+| where statement_s has 'alter login'
+| project LogicalServerName_s, Resource, event_time_t, succeeded_s, server_principal_name_s, action_name_s, statement_s

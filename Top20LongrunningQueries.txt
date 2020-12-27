@@ -1,0 +1,71 @@
+let databaseName = 'PRASYNAPSETEMPPOOL';
+//Top 20 long running queries sorted by execution time in the selected interval;  
+//If 'Command' is empty - you need to set a bigger time window, the older record with the empty command is outside your selected window
+AzureDiagnostics
+| where Category == 'ExecRequests'
+| where Resource == databaseName
+| where StatementType_s !in ('Batch', 'Execute')
+| summarize Session_ID=any(SessionId_s),
+    Request_ID=any(RequestId_s),
+    Submit_Time=max(SubmitTime_t),
+    Start_Time=max(StartTime_t),
+    End_Time=max(EndTime_t),
+    Command=any(Command_s),
+    Status=min(Status_s), //This works because Completed/Failed/Cancelled are all below running, below suspended. This happens to work out where the min is the current status
+    Statement_Type=any(StatementType_s),
+    Resource_class=any(ResourceClass_s)
+    by RequestId_s
+| summarize ElapsedTime_min=anyif((End_Time - Start_Time) / 1m, Start_Time > ago(30d)), Session_ID=any(Session_ID), Submit_Time=any(Submit_Time), Start_Time=any(Start_Time), End_Time=any(End_Time), Command=any(Command), Status=any(Status), Statement_Type=any(Statement_Type), Resource_class=any(Resource_class) by Request_ID
+| order by ElapsedTime_min desc
+| limit 20
+
+//////////////////////////////////////////////////////////////////////////
+// Uncomment the following sections to investigate further              //
+// To Uncomment : select multiple lines and press ctrl+k then ctrl+u    //
+// To Comment : select multiple lines and press ctrl+k then ctrl+c      //
+//////////////////////////////////////////////////////////////////////////
+
+// let databaseName = 'PRASYNAPSETEMPPOOL';
+// //list of queries in the session, their query text and other metrics 
+// AzureDiagnostics
+// | where SessionId_s == "SID129241" // replace the sessionID of the long running query here
+// | where StatementType_s !in ('Batch', 'Execute')
+// | where Category  == 'ExecRequests'
+// | summarize
+//         status = min(Status_s)
+//         , StartTime = max(StartTime_t)
+//         , EndTime = max(EndTime_t)
+//         , Duration = max(EndTime_t) - max(StartTime_t)
+//         , rootqueryID = max(RootQueryId_s)
+//         , StatementType =max(StatementType_s)
+//         , command = max(Command_s)
+//     by RequestId_s
+// | sort by RequestId_s asc 
+
+// let databaseName = 'PRASYNAPSETEMPPOOL';
+// //Granular details per substep; gives you the distributed query plan for your long running query
+// AzureDiagnostics
+// | where RequestId_s in ( "QID1228659") // replace the queryID of the long running query here
+// | where Category  == 'RequestSteps'
+// | summarize
+//         status = min(Status_s)
+//         , OperationType = max(OperationType_s)
+//         , DistributionType = max(DistributionType_s)
+//         , LocationType = max(LocationType_s)
+//         , StartTime = max(StartTime_t)
+//         , EndTime = max(EndTime_t)
+//         , Duration = max(EndTime_t) - max(StartTime_t)
+//         , RowCount = max(RowCount_d)
+//         , StatementType =max(StatementType_s)
+//         , command = max(Command_s)
+//     by RequestId_s, StepIndex_d
+// |sort by RequestId_s, StepIndex_d asc 
+
+// let databaseName = 'PRASYNAPSETEMPPOOL';
+// // Granular details per distribution for your long running substep
+// AzureDiagnostics
+// | where Category == "SqlRequests"
+// | where RequestId_s in ( "QID1228659")
+// | where StepIndex_d == 11
+// |where Status_s == "Complete"
+// | project PdwNodeId_d, DistributionId_d, StartTime_t, EndTime_t, duration = EndTime_t - StartTime_t, RowCount_d, Spid_d, Status_s;
