@@ -1,0 +1,1 @@
+# AzureSynapseAnalytics_LogAnalyticsScripts
